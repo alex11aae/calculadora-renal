@@ -5,7 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Calculadora Renal 🩺</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="manifest" href="manifest.json">
+  <style>
+    /* Solución para compatibilidad móvil adicional */
+    body {
+      font-family: 'Arial', sans-serif;
+    }
+    input, select {
+      font-size: 1rem;
+    }
+    button {
+      font-size: 1.1rem;
+    }
+  </style>
 </head>
 <body class="bg-gradient-to-br from-green-100 to-blue-200 min-h-screen flex flex-col justify-center items-center p-4">
 
@@ -52,19 +63,75 @@
   </div>
 
   <script>
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("sw.js").then(() => {
-        console.log("Service Worker registrado con éxito.");
-      }).catch(error => {
-        console.error("Error al registrar el Service Worker:", error);
-      });
-    }
-
     document.getElementById("renalForm").addEventListener("submit", function(event) {
-      // Código de calculadora renal...
+      event.preventDefault(); // Evitar la recarga de la página
+
+      const edad = parseInt(document.getElementById("edad").value);
+      const sexo = document.getElementById("sexo").value;
+      const peso = parseInt(document.getElementById("peso").value);
+      const creatinina = parseFloat(document.getElementById("creatinina").value);
+
+      let a, d, k, sexn;
+      if (sexo === "F") {
+        a = -0.241;
+        d = 1.018;
+        k = 0.7;
+        sexn = 379.42;
+      } else {
+        a = -0.302;
+        d = 1;
+        k = 0.9;
+        sexn = 0;
+      }
+
+      const genCr = 879.89 + (12.51 * peso) - (6.19 * edad) - sexn;
+      const eGFR = 142 * Math.pow(Math.min(creatinina / k, 1), a) * Math.pow(Math.max(creatinina / k, 1), -1.2) * Math.pow(0.9938, edad) * d;
+      const eClCr = genCr / (creatinina * 14.4);
+
+      const n = 0.85 * Math.pow(10, -4);
+      const simulacion = Array.from({ length: 2000000 }, (_, i) => {
+        const nephronCount = i + 1;
+        const egfrSimulado = (3 * Math.pow(10, -11) * Math.pow(nephronCount, 2)) - (n * nephronCount * Math.log(nephronCount / (2 * Math.pow(10, 6))));
+        return { nephronCount, egfrSimulado };
+      });
+
+      const buscarNefronas = (valor) => {
+        return simulacion.filter(item => Math.abs(item.egfrSimulado - valor) < 0.01);
+      };
+
+      const intervaloEGFR = buscarNefronas(eGFR);
+      const intervaloClCr = buscarNefronas(eClCr);
+
+      const minNefronas = Math.min(intervaloEGFR[0]?.nephronCount || 2000000, intervaloClCr[0]?.nephronCount || 2000000);
+      const maxNefronas = Math.max(intervaloEGFR[0]?.nephronCount || 2000000, intervaloClCr[0]?.nephronCount || 2000000);
+
+      const intervaloNefronas = `entre ${(minNefronas / 1_000_000).toFixed(2)} y ${(maxNefronas / 1_000_000).toFixed(2)} millones`;
+
+      document.getElementById("genCr").textContent = `Generación de creatinina estimada: ${genCr.toFixed(2)} mg/24h`;
+      document.getElementById("eClCr").textContent = `Aclaramiento de creatinina estimado: ${eClCr.toFixed(2)} mL/min`;
+      document.getElementById("eGFR").textContent = `Filtrado glomerular estimado (CKD-EPI): ${eGFR.toFixed(2)} mL/min/1.73m²`;
+      document.getElementById("nefronas").textContent = `Nefronas restantes estimadas: ${intervaloNefronas}`;
+
+      const recomendaciones = document.getElementById("recomendaciones");
+      const felicitaciones = document.getElementById("felicitaciones");
+
+      if (eGFR < 60) {
+        recomendaciones.textContent = `🔴 Tus resultados sugieren función renal reducida. 
+        👉 Recomendaciones:
+        - Incrementa el consumo de frutas y verduras 🍎🥦
+        - Reduce la sal 🧂
+        - Mantente hidratado 💧
+        - Visita a tu nefrólogo lo antes posible 🩺`;
+        recomendaciones.classList.remove("hidden");
+        felicitaciones.classList.add("hidden");
+      } else {
+        felicitaciones.classList.remove("hidden");
+        recomendaciones.classList.add("hidden");
+      }
+
+      document.getElementById("resultados").classList.remove("hidden");
     });
   </script>
 
 </body>
 </html>
-
